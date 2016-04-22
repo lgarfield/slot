@@ -1,72 +1,56 @@
 package main
 
 import(
-	"fmt"
-	"github.com/go-martini/martini"
-	"html"
-	// "log"
+	"github.com/gin-gonic/gin"
 	"net/http"
+	"os"
 	"slot/client"
 	"slot/config"
-	//"slot/web"
-	"strings"
-	// "time"
-	"regexp"
 )
 
-func main() {
-	m := martini.Classic()
-	m.Use(MapEncoder)
-
-	// start mysql
-	dbmap := config.InitDb()
-	defer dbmap.Db.Close()
-
-	m.Get("/client", func(rw http.ResponseWriter, rq *http.Request) error {
-		rq.ParseForm()
-		fmt.Fprintln(rw, html.EscapeString(rq.URL.Host))
-		fmt.Fprintf(rw, "Hello, %q, -=- %v", html.EscapeString(rq.URL.Path), html.EscapeString(rq.URL.Host))
-		err := client.Get(rw, rq, dbmap)
-
-		return err
-	})
-
-	m.Post("/client", func(rw http.ResponseWriter, rq *http.Request) error {
-		err := client.Post(rw, rq, dbmap)
-
-		return err
-	})
-
-	m.Run()
+type User struct {
+	Id int
+	Account string
+	Passwd string
+	Reg_date string
+	Reg_ip string
 }
 
-// The regex to check for the requested format (allows an optional tralling slash.)
-var rxExt = regexp.MustCompile(`(\.(?:text|json))\/?$`)
+func init() {
+	os.Setenv("ENV", "developments")
+}
 
-// MapEncoder intercepts the request's URL, detects the required format, and injects the correct encoder dependency for this request.
-// It writes the URL to remove the format extension, so that routes can be defined without it.
-func MapEncoder(c martini.Context, w http.ResponseWriter, r *http.Request) {
-	// Get the format extension
-	matches := rxExt.FindStringSubmatch(r.URL.Path)
-	ft := ".json"
+func main() {
+	// Create a gin router with default middleware.
+	// logger and recovery (crash-free) middleware
+	router := gin.Default()
 
-	if len(matches) > 1 {
-		l := len(r.URL.Path) - len(matches[1])
-		if strings.HasSuffix(r.URL.Path, "/") {
-			l--
-		}
-		r.URL.Path = r.URL.Path[:1]
-		ft = matches[1]
+	dbMap := config.InitDb()
+	defer dbMap.Db.Close()
+
+	// Delete any existings rows.
+	err := dbMap.TruncateTables()
+	if err != nil {
+		panic(err) // TODO
 	}
 
-	switch ft {
-	case ".text":
-		text := textEncoder{}
-		c.MapTo(text, (*Encoder)(nil))
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	default:
-		json := jsonEncoder{}
-		c.MapTo(json, (*Encoder)(nil))
-		w.Header().Set("Content-Type", "application/json")
-	}
+	router.GET("/", func(c *gin.Context) {
+		c.String(http.StatusNotFound, "Oops...")
+	})
+
+	router.GET("/client", func(c *gin.Context) {
+		client.Get(c, dbMap)
+	})
+	router.POST("/client", func(c *gin.Context) {
+		client.Post(c, dbMap)
+	})
+	router.PUT("/client", func(c *gin.Context) {})
+	router.DELETE("/client", func(c *gin.Context) {})
+	router.PATCH("/client", func(c *gin.Context) {})
+	router.HEAD("/client", func(c *gin.Context) {})
+
+
+	// By default it serves on :8080 unless a PORT environment variable was defined.
+	router.Run(":80")
+	// router.Run(":8000") for a hard coded port
 }
