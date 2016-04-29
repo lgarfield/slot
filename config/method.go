@@ -2,24 +2,14 @@ package config
 
 import (
 	"errors"
-	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"time"
 )
 
 // get the format time -- YYYY-MM-DD HH:ii:ss
 func SelfTime() string {
-	currentTime := time.Now()
-	t := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), currentTime.Hour(), currentTime.Minute(), currentTime.Second(), 0, time.UTC)
-
-	return t.String()
-}
-
-// get the custom IP address
-func SelfIp(r *http.Request) string {
-	return strings.Split(r.RemoteAddr, ":")[0]
+	return time.Now().Format("2006-01-02 15:04:05")
 }
 
 // judgment path is or not exist
@@ -39,13 +29,13 @@ func GetFileAbsolutePath(dir, currentDir, path string) string {
 }
 
 // verify request is valid or not.
-func ValidRequest(path string) (err error) {
+func ValidRequest(dir, path string) (err error) {
 	dirName, err := os.Getwd()
 	if err != nil {
 		return
 	}
 
-	fileName := GetFileAbsolutePath(dirName, "client", path)
+	fileName := GetFileAbsolutePath(dirName, dir, path)
 
 	if flag := PathExists(fileName); flag == false {
 		return errors.New("file not exist.")
@@ -55,8 +45,8 @@ func ValidRequest(path string) (err error) {
 }
 
 // Call
-func Call(m map[string]interface{}, name string, params ...interface{}) (result []reflect.Value, err error) {
-	f := reflect.ValueOf(m[name])
+func Call(name interface{}, params ...interface{}) (result []interface{}, err error) {
+	f := reflect.ValueOf(name)
 	if len(params) != f.Type().NumIn() {
 		err = errors.New("The number of param is not adapted.")
 		return
@@ -67,6 +57,21 @@ func Call(m map[string]interface{}, name string, params ...interface{}) (result 
 		in[k] = reflect.ValueOf(param)
 	}
 
-	result = f.Call(in)
+	out := f.Call(in)
+	if len(out) > 0 {
+		//prepare out paras
+		result = make([]interface{}, 0)
+		for _, v := range out {
+			if "error" == v.Type().String() {
+				if nil != v.Interface() {
+					err = v.Interface().(error)
+					return
+				}
+			} else {
+				result = append(result, v.Interface())
+			}
+		}
+	}
+
 	return
 }

@@ -3,21 +3,12 @@ package main
 import(
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"os"
 	"slot/client"
 	"slot/config"
 )
 
-type User struct {
-	Id int
-	Account string
-	Passwd string
-	Reg_date string
-	Reg_ip string
-}
-
 func init() {
-	os.Setenv("ENV", "developments")
+	//gin.SetMode(gin.ReleaseMode)
 }
 
 func main() {
@@ -29,12 +20,15 @@ func main() {
 	defer dbMap.Db.Close()
 
 	// Delete any existings rows.
-	err := dbMap.TruncateTables()
-	if err != nil {
-		panic(err) // TODO
-	}
+	//err := dbMap.TruncateTables()
+	//if err != nil {
+	//	panic(err) // TODO
+	//}
 
 	router.GET("/", func(c *gin.Context) {
+		c.String(http.StatusNotFound, "Oops...")
+	})
+	router.POST("/", func(c *gin.Context) {
 		c.String(http.StatusNotFound, "Oops...")
 	})
 

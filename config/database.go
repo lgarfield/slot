@@ -21,7 +21,7 @@ func InitDb() *gorp.DbMap {
 	if os.Getenv("CLEARDB_DATABASE_URL") != "" {
 		datasource = convert_datasource(os.Getenv("CLEARDB_DATABASE_URL"))
 	} else {
-		datasource = DbUser + ":" + DbPwd + "@" + DbHost + "/" + DbTable + "?charset=utf8"
+		datasource = DbUser + ":" + DbPwd + "@tcp(" + DbHost + ":" + DbPort + ")/" + DbTable + "?charset=utf8"
 	}
 
 	db, err := sql.Open("mysql", datasource)

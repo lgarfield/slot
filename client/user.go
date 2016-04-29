@@ -1,25 +1,21 @@
 package client
 
 import(
-	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/gorp.v1"
-	//"net/http"
-	"reflect"
 	"slot/config"
 )
 
-func userRegister(c *gin.Context, db *gorp.DbMap) (result []reflect.Value, err error) {
+func userRegister(c *gin.Context, db *gorp.DbMap) (result []interface{}, err error) {
 	// register
-	Register := slot_user_basic{}
-	_, err = Register.Register(c, db)
+	_, err = Register(c, db)
 	if err != nil {
 		return
 	}
 
 	// login for the auth-token
-	Login := slot_login_session{}
-	result, err = Login.Login(c, db)
+	result, err = Login(c, db)
 	if err != nil {
 		return
 	}
@@ -33,25 +29,34 @@ func userRegister(c *gin.Context, db *gorp.DbMap) (result []reflect.Value, err e
  *
  */
 type slot_login_session struct {
-	Id int `form:"id" json:"id" db:"id,size:11,primarykey,autoincrement"`
-	Account string `form:"account" json:"account" db:"account,size:20" binding:"required"`
+	Id int `form:"id" json:"id" db:"id"`
+	Account string `form:"account" json:"account" db:"account" binding:"required"`
 	LoginIp string `db:"login_ip"`
 	LoginTime string `db:"login_time"`
 	LoginSession string `db:"login_session"`
 }
 
-func (l *slot_login_session) Login(c *gin.Context, db *gorp.DbMap) (result []reflect.Value, err error) {
-	l.Account = c.PostForm("account")
-	l.LoginTime = config.SelfTime()
-	l.LoginIp = config.SelfIp(c.Request)
-	l.LoginSession = "ssfesdfnnanniensndfjensndnf"
+type login_result struct {
+	Session string `json:"session"`
+}
 
+func Login(c *gin.Context, db *gorp.DbMap) (result []interface{}, err error) {
+	l := slot_login_session{
+		Account:c.PostForm("account"),
+		LoginTime:config.SelfTime(),
+		LoginIp:c.ClientIP(),
+		LoginSession:"aaaaaaaaaaaaaaa",
+	}
+
+	db.AddTableWithName(slot_login_session{}, "slot_login_session").SetKeys(true, "Id")
 	err = db.Insert(&l)
 	if err != nil {
 		return
 	}
 
-	result = config.Result{}
+	login_result := login_result{Session:l.LoginSession}
+	result = append(result, login_result)
+
 	return
 }
 
@@ -61,31 +66,35 @@ func (l *slot_login_session) Login(c *gin.Context, db *gorp.DbMap) (result []ref
  *
  */
 type slot_user_basic struct {
-	Id int `form:"id" json:"id" db:"id,size:11,primarykey,autoincrement"`
-	Account string `form:"account" json:"account" binding:"required" db:"account,size:20"`
-	Passwd string `form:"passwd" json:"passwd" binding:"required" db:"passwd,size:20"`
+	Id int `form:"id" json:"id" db:"id"`
+	Account string `form:"account" json:"account" binding:"required" db:"account"`
+	Passwd string `form:"passwd" json:"passwd" binding:"required" db:"passwd"`
 	RegDate string `db:"reg_date"`
 	RegIp string `db:"reg_ip"`
 }
 
-func (u *slot_user_basic)Register(c *gin.Context, db *gorp.DbMap) (result []reflect.Value, err error) {
-	if c.BindJSON(&u) == nil {
-		// judgement account that posted is exist or not.
-		// TODO
-
-		// set reg_date, reg_ip
-		u.RegDate = config.SelfTime()
-		u.RegIp = config.SelfIp(c.Request)
-
-		// register
-		err = db.Insert(&u)
-		if err != nil {
-			return
-		}
-
+func Register(c *gin.Context, db *gorp.DbMap) (result []interface{}, err error) {
+	u := slot_user_basic{
+		Id:0,
+		Account:"",
+		Passwd:"",
+		RegDate:config.SelfTime(),
+		RegIp:c.ClientIP(),
+	}
+	if err = c.Bind(&u); err != nil {
+		fmt.Print(err)
 		return
 	}
 
-	err = errors.New("Nothing is provided.")
+	// judgement account that posted is exist or not.
+	// TODO
+
+	// register
+	db.AddTableWithName(slot_user_basic{}, "slot_user_basic").SetKeys(true, "Id")
+	err = db.Insert(&u)
+	if err != nil {
+		return
+	}
+
 	return
 }
