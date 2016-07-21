@@ -1,5 +1,0 @@
-package winslot
-
-import(
-
-)

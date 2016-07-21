@@ -1,50 +1,60 @@
 package main
 
-import(
-	"github.com/gin-gonic/gin"
-	"net/http"
-	"slot/client"
-	"slot/config"
+import (
+	// module
+	"slot/db"
+	"slot/login"
+
+	// Internal
+	"log"
+	"net"
+	"net/rpc"
+	"net/rpc/jsonrpc"
+	"os"
+	"sync"
 )
 
-func init() {
-	//gin.SetMode(gin.ReleaseMode)
-}
+type (
+
+)
 
 func main() {
-	// Create a gin router with default middleware.
-	// logger and recovery (crash-free) middleware
-	router := gin.Default()
+	login := new(login.Login)
+	rpc.Register(login)
 
-	dbMap := config.InitDb()
-	defer dbMap.Db.Close()
+	dbRpc := new(db.Db)
+	rpc.Register(dbRpc)
 
-	// Delete any existings rows.
-	//err := dbMap.TruncateTables()
-	//if err != nil {
-	//	panic(err) // TODO
-	//}
+	tcpAddr, err := net.ResolveTCPAddr("tcp", ":1234")
+	checkError(err)
 
-	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusNotFound, "Oops...")
-	})
-	router.POST("/", func(c *gin.Context) {
-		c.String(http.StatusNotFound, "Oops...")
-	})
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	defer listener.Close()
+	checkError(err)
 
-	router.GET("/client", func(c *gin.Context) {
-		client.Get(c, dbMap)
-	})
-	router.POST("/client", func(c *gin.Context) {
-		client.Post(c, dbMap)
-	})
-	router.PUT("/client", func(c *gin.Context) {})
-	router.DELETE("/client", func(c *gin.Context) {})
-	router.PATCH("/client", func(c *gin.Context) {})
-	router.HEAD("/client", func(c *gin.Context) {})
+	mutex := &sync.Mutex{}
 
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println("Fatal error:", err.Error())
 
-	// By default it serves on :8080 unless a PORT environment variable was defined.
-	router.Run(":80")
-	// router.Run(":8000") for a hard coded port
+			continue
+		}
+
+		go func () {
+			mutex.Lock()
+
+			jsonrpc.ServeConn(conn)
+
+			mutex.Unlock()
+		}()
+	}
+}
+
+func checkError(err error) {
+	if err != nil {
+		log.Println("Fatal error:", err.Error())
+		os.Exit(1)
+	}
 }
